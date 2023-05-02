@@ -373,13 +373,26 @@ namespace HelloAR
         {
             this.RunOnUiThread(() =>
             {
+                ImageView image = new ImageView(this);
+                image.SetImageResource(Resource.Drawable.hand_holding_phone);
+                image.SetAdjustViewBounds(true);
+                image.SetScaleType(ImageView.ScaleType.FitCenter);
                 mLoadingMessageSnackbar = Snackbar.Make(FindViewById(Android.Resource.Id.Content),
                     "Searching for surfaces...", Snackbar.LengthIndefinite);
-                mLoadingMessageSnackbar.View.SetBackgroundColor(Android.Graphics.Color.DarkGray);
+                Snackbar.SnackbarLayout layout = (Snackbar.SnackbarLayout)mLoadingMessageSnackbar.View;
+                layout.SetMinimumHeight(100);
+                layout.SetBackgroundColor(Android.Graphics.Color.Transparent); // set background to be transparent
+                layout.Alpha = 1.0f;
+
+                // set background color of the text view to gray
+                TextView textView = layout.FindViewById<TextView>(Resource.Id.snackbar_text);
+                textView.SetBackgroundColor(Android.Graphics.Color.DarkGray);
+
+                layout.AddView(image, 0);
                 mLoadingMessageSnackbar.Show();
             });
         }
-
+    
         private void hideLoadingMessage()
         {
             this.RunOnUiThread(() =>
