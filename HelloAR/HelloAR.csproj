@@ -113,7 +113,14 @@
   <ItemGroup>
     <Compile Include="PathTracking.cs" />
     <Compile Include="MainActivity.cs" />
+    <Compile Include="Rendering\BallPivotingAlgorithm.cs" />
+    <Compile Include="Rendering\Delaunay.cs" />
+    <Compile Include="Rendering\FlyCamera.cs" />
     <Compile Include="Rendering\GridRenderer.cs" />
+    <Compile Include="Rendering\OcTree.cs" />
+    <Compile Include="Rendering\PointCloud.cs" />
+    <Compile Include="Rendering\RunBPAlg.cs" />
+    <Compile Include="Rendering\VoxelRenderer.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rendering\ShaderUtil.cs" />
