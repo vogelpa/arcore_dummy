@@ -15,7 +15,7 @@ using Android.Support.V4.App;
 using Javax.Microedition.Khronos.Egl;
 using System.Collections.Concurrent;
 using System;
-using Google.AR.Core.Exceptions;
+using Google.AR.Core.Exceptions; 
 
 namespace HelloAR
 {
@@ -342,6 +342,8 @@ namespace HelloAR
                 // Visualize planes.
                 mPlaneRenderer.DrawPlanes(planes, camera.DisplayOrientedPose, projmtx);
 
+                
+
                 // Visualize anchors created by touch.
                 float scaleFactor = 1.0f;
                 foreach (var anchor in mAnchors)
@@ -407,6 +409,7 @@ namespace HelloAR
         {
             return mGestureDetector.OnTouchEvent(e);
         }
+
     }
 
     class SimpleTapGestureDetector : GestureDetector.SimpleOnGestureListener

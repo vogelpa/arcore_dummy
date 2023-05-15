@@ -383,12 +383,18 @@ namespace HelloAR
 		private static void colorRgbaToFloat(float[] planeColor, int colorRgba)
 		{
 			planeColor[0] = ((float)((colorRgba >> 24) & 0xff)) / 255.0f;
+            planeColor[1] = ((float)((colorRgba >> 24) & 0xff)) / 255.0f;
+            planeColor[2] = ((float)((colorRgba >> 24) & 0xff)) / 255.0f;
+            planeColor[3] = ((float)((colorRgba >> 24) & 0xff)) / 255.0f;
+
+            /*
 			planeColor[1] = ((float)((colorRgba >> 16) & 0xff)) / 255.0f;
 			planeColor[2] = ((float)((colorRgba >> 8) & 0xff)) / 255.0f;
 			planeColor[3] = ((float)((colorRgba >> 0) & 0xff)) / 255.0f;
-		}
+			*/
+        }
 
-		static readonly int[] PLANE_COLORS_RGBA = {
+        static readonly int[] PLANE_COLORS_RGBA = {
 		//0xFFFFFFFF,
 		//0xF44336FF,
 		//0xE91E63FF,
