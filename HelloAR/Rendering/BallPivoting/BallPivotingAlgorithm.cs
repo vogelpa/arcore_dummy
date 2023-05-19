@@ -5,7 +5,7 @@ using UnityEngine;
 
 using renge_pcl;
 using renge_pcl.octree;
-using UnityEngine.UI;
+//using UnityEngine.UI;
 
 public enum PointMeshType {
 	Sphere
@@ -21,7 +21,7 @@ public class BallPivotingAlgorithm : MonoBehaviour {
 	Mesh mesh;
 	MeshFilter meshFilter;
 	float startTime;
-	public Text text;
+	//public Text text;
 	bool running;
 	int pivotsPerUpdate = 1;
 	int pivotAnimationSteps = 5;
@@ -140,9 +140,9 @@ public class BallPivotingAlgorithm : MonoBehaviour {
 		Debug.Log("Mesh created in: " + meshTime + "s");
 		Debug.Log("Tris:" + preMesh.Count);
 
-		text.text = "Point Cloud initialized in: " + initTime + "s\n" +
+		/*text.text = "Point Cloud initialized in: " + initTime + "s\n" +
 					"Triangulation completed in: " + triangTime + "s\n" +
-					"Mesh created in: " + meshTime + "s";
+					"Mesh created in: " + meshTime + "s";*/
 	}
 
 	Triangle toAdd;

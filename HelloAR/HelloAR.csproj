@@ -52,14 +52,17 @@
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
     <Reference Include="Mono.Android" />
+    <Reference Include="Triangle">
+      <HintPath>..\..\Triangle.NET\src\Triangle\bin\Debug\netstandard2.0\Triangle.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.Abstractions, Version=5.11.7.0, Culture=neutral, PublicKeyToken=489b6accfaf20ef0, processorArchitecture=MSIL">
       <HintPath>..\packages\Unity.5.11.10\lib\netstandard2.0\Unity.Abstractions.dll</HintPath>
     </Reference>
     <Reference Include="Unity.Container, Version=5.11.11.0, Culture=neutral, PublicKeyToken=489b6accfaf20ef0, processorArchitecture=MSIL">
       <HintPath>..\packages\Unity.5.11.10\lib\netstandard2.0\Unity.Container.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\UnityEngine.1.0.0\lib\UnityEngine.dll</HintPath>
+    <Reference Include="UnityEngine">
+      <HintPath>..\packages\UnityTechnologies.UnityEngine.2020.2.2.1\lib\UnityEngine.dll</HintPath>
     </Reference>
     <Reference Include="Xamarin.Android.Arch.Core.Common, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Xamarin.Android.Arch.Core.Common.1.0.0.1\lib\MonoAndroid80\Xamarin.Android.Arch.Core.Common.dll</HintPath>
@@ -107,20 +110,23 @@
       <HintPath>..\packages\Xamarin.Android.Support.Vector.Drawable.27.0.2.1\lib\MonoAndroid81\Xamarin.Android.Support.Vector.Drawable.dll</HintPath>
     </Reference>
     <Reference Include="Xamarin.Google.ARCore, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Xamarin.Google.ARCore.1.0.0\lib\MonoAndroid70\Xamarin.Google.ARCore.dll</HintPath>
+      <HintPath>..\packages\Xamarin.Google.ARCore.1.29.0\lib\MonoAndroid100\Xamarin.Google.ARCore.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="PathTracking.cs" />
     <Compile Include="MainActivity.cs" />
-    <Compile Include="Rendering\BallPivotingAlgorithm.cs" />
-    <Compile Include="Rendering\Delaunay.cs" />
-    <Compile Include="Rendering\FlyCamera.cs" />
+    <Compile Include="Rendering\BallPivoting\BallPivotingAlgorithm.cs" />
+    <Compile Include="Rendering\BallPivoting\Delaunay.cs" />
+    <Compile Include="Rendering\BallPivoting\FlyCamera.cs" />
+    <Compile Include="Rendering\CellRenderer.cs" />
+    <Compile Include="Rendering\PlaneDivider.cs" />
+    <Compile Include="Rendering\Projection.cs" />
     <Compile Include="Rendering\GridRenderer.cs" />
-    <Compile Include="Rendering\OcTree.cs" />
-    <Compile Include="Rendering\PointCloud.cs" />
-    <Compile Include="Rendering\RunBPAlg.cs" />
-    <Compile Include="Rendering\VoxelRenderer.cs" />
+    <Compile Include="Rendering\BallPivoting\OcTree.cs" />
+    <Compile Include="Rendering\BallPivoting\PointCloud.cs" />
+    <Compile Include="Rendering\BallPivoting\RunBPAlg.cs" />
+    <Compile Include="Rendering\BallPivoting\VoxelRenderer.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rendering\ShaderUtil.cs" />
@@ -132,6 +138,7 @@
     <Compile Include="DisplayRotationHelper.cs" />
   </ItemGroup>
   <ItemGroup>
+    <AndroidAsset Include="Assets\andy.obj" />
     <None Include="packages.config" />
     <None Include="Resources\AboutResources.txt" />
     <None Include="Properties\AndroidManifest.xml" />
@@ -156,7 +163,6 @@
     <AndroidResource Include="Resources\raw\screenquad_vertex.shader" />
     <AndroidResource Include="Resources\values\styles.xml" />
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <ProjectReference Include="..\JavaGL\JavaGL.csproj">
       <Project>{7B372CCE-4D08-4562-9B71-A36295CD14A0}</Project>
@@ -166,12 +172,15 @@
   <ItemGroup>
     <AndroidAsset Include="Assets\andy_shadow.obj" />
     <AndroidAsset Include="Assets\andy_shadow.png" />
-    <AndroidAsset Include="Assets\andy.obj" />
+    <AndroidAsset Include="Assets\2D.obj" />
     <AndroidAsset Include="Assets\andy.png" />
     <AndroidAsset Include="Assets\trigrid.png" />
   </ItemGroup>
   <ItemGroup>
     <AndroidResource Include="Resources\drawable\hand_holding_phone.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <AndroidAsset Include="Assets\black_x.png" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\Android\Xamarin.Android.CSharp.targets" />
   <Import Project="..\packages\Xamarin.Android.Support.Annotations.27.0.2.1\build\MonoAndroid81\Xamarin.Android.Support.Annotations.targets" Condition="Exists('..\packages\Xamarin.Android.Support.Annotations.27.0.2.1\build\MonoAndroid81\Xamarin.Android.Support.Annotations.targets')" />

@@ -5,17 +5,16 @@ using Android.OS;
 using Android.Opengl;
 using Google.AR.Core;
 using Android.Util;
-using Java.Interop;
 using Javax.Microedition.Khronos.Opengles;
 using Android.Support.Design.Widget;
 using System.Collections.Generic;
 using Android.Views;
 using Android.Support.V4.Content;
 using Android.Support.V4.App;
-using Javax.Microedition.Khronos.Egl;
 using System.Collections.Concurrent;
 using System;
-using Google.AR.Core.Exceptions; 
+using Google.AR.Core.Exceptions;
+using UnityEngine.XR;
 
 namespace HelloAR
 {
@@ -23,7 +22,7 @@ namespace HelloAR
     public class MainActivity : AppCompatActivity, GLSurfaceView.IRenderer, Android.Views.View.IOnTouchListener
     {
         const string TAG = "HELLO-AR";
-
+        
         // Rendering. The Renderers are created here, and initialized when the GL surface is created.
         GLSurfaceView mSurfaceView;
 
@@ -45,6 +44,7 @@ namespace HelloAR
 
         // Tap handling and UI.
         List<Anchor> mAnchors = new List<Anchor>();
+        int frameCounter = 0;
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
@@ -90,6 +90,7 @@ namespace HelloAR
 
             // Create default config, check is supported, create session from that config.
             var config = new Google.AR.Core.Config(mSession);
+            config.SetPlaneFindingMode(Google.AR.Core.Config.PlaneFindingMode.HorizontalAndVertical);
             if (!mSession.IsSupported(config))
             {
                 Toast.MakeText(this, "This device does not support AR", ToastLength.Long).Show();
@@ -210,13 +211,14 @@ namespace HelloAR
             // Prepare the other rendering objects.
             try
             {
-                mVirtualObject.CreateOnGlThread(/*context=*/this, "andy.obj", "andy.png");
-                mVirtualObject.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
+                mVirtualObject.CreateOnGlThread(/*context=*/this, "2D.obj", "black_x.png");
+                //mVirtualObject.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
+                mVirtualObject.SetBlendMode(ObjectRenderer.BlendMode.Grid);
 
-                mVirtualObjectShadow.CreateOnGlThread(/*context=*/this,
-                    "andy_shadow.obj", "andy_shadow.png");
-                mVirtualObjectShadow.SetBlendMode(ObjectRenderer.BlendMode.Shadow);
-                mVirtualObjectShadow.setMaterialProperties(1.0f, 0.0f, 0.0f, 1.0f);
+                //mVirtualObjectShadow.CreateOnGlThread(/*context=*/this,
+                //    "andy_shadow.obj", "andy_shadow.png");
+                //mVirtualObjectShadow.SetBlendMode(ObjectRenderer.BlendMode.Shadow);
+                //mVirtualObjectShadow.setMaterialProperties(1.0f, 0.0f, 0.0f, 1.0f);
             }
             catch (Java.IO.IOException e)
             {
@@ -242,6 +244,7 @@ namespace HelloAR
 
         public void OnDrawFrame(IGL10 gl)
         {
+            frameCounter++;
             // Clear screen to notify driver it should not load any pixels from previous frame.
             GLES20.GlClear(GLES20.GlColorBufferBit | GLES20.GlDepthBufferBit);
 
@@ -269,26 +272,23 @@ namespace HelloAR
                 {
                     foreach (var hit in frame.HitTest(tap))
                     {
+
                         var trackable = hit.Trackable;
-
+                        //if (trackable is Point)
+                        //{
                         // Check if any plane was hit, and if it was hit inside the plane polygon.
-                        if (trackable is Plane && ((Plane)trackable).IsPoseInPolygon(hit.HitPose))
-                        {
-                            // Cap the number of objects created. This avoids overloading both the
-                            // rendering system and ARCore.
-                            if (mAnchors.Count >= 16)
-                            {
-                                mAnchors[0].Detach();
-                                mAnchors.RemoveAt(0);
-                            }
-                            // Adding an Anchor tells ARCore that it should track this position in
-                            // space.  This anchor is created on the Plane to place the 3d model
-                            // in the correct position relative to both the world and to the plane
-                            mAnchors.Add(hit.CreateAnchor());
+                        //if (trackable is Plane && ((Plane)trackable).IsPoseInPolygon(hit.HitPose))
+                        //{
 
-                            // Hits are sorted by depth. Consider only closest hit on a plane.
-                            break;
-                        }
+                        // Adding an Anchor tells ARCore that it should track this position in
+                        // space.  This anchor is created on the Plane to place the 3d model
+                        // in the correct position relative to both the world and to the plane
+                        mAnchors.Add(hit.CreateAnchor());
+
+                        // Hits are sorted by depth. Consider only closest hit on a plane.
+                        break;
+                        //}
+                        //}
                     }
                 }
 
@@ -319,10 +319,34 @@ namespace HelloAR
                 pointCloud.Release();
 
                 var planes = new List<Plane>();
+                var planeHitResults = new List<List<HitResult>>();
+
+
                 foreach (var p in mSession.GetAllTrackables(Java.Lang.Class.FromType(typeof(Plane))))
                 {
+
                     var plane = (Plane)p;
-                    planes.Add(plane);
+                    if (plane.SubsumedBy == null)
+                    {
+                        planes.Add(plane);
+                    }
+
+                    if (frameCounter % 25 == 0)
+                    {
+                        planeHitResults.Add(PlaneDivider.DividePlaneIntoCells(frame, plane));
+                    }
+                }
+
+                if (frameCounter % 25 == 0) { 
+                    mAnchors.Clear();
+
+                    foreach (var singlePlaneHitResults in planeHitResults)
+                    {
+                        foreach (var hit in singlePlaneHitResults)
+                        {
+                            mAnchors.Add(hit.CreateAnchor());
+                        }
+                    }
                 }
 
                 // Check if we detected at least one plane. If so, hide the loading message.
@@ -341,11 +365,12 @@ namespace HelloAR
 
                 // Visualize planes.
                 mPlaneRenderer.DrawPlanes(planes, camera.DisplayOrientedPose, projmtx);
+                //Projection.GetMeshFromFrame(frame);
 
-                
+                //RunBPAlg runBPAlg = go.AddComponent<RunBPAlg>();
 
                 // Visualize anchors created by touch.
-                float scaleFactor = 1.0f;
+                float scaleFactor = 0.05f;
                 foreach (var anchor in mAnchors)
                 {
                     if (anchor.TrackingState != TrackingState.Tracking)
@@ -358,9 +383,9 @@ namespace HelloAR
 
                     // Update and draw the model and its shadow.
                     mVirtualObject.updateModelMatrix(mAnchorMatrix, scaleFactor);
-                    mVirtualObjectShadow.updateModelMatrix(mAnchorMatrix, scaleFactor);
+                    //mVirtualObjectShadow.updateModelMatrix(mAnchorMatrix, scaleFactor);
                     mVirtualObject.Draw(viewmtx, projmtx, lightIntensity);
-                    mVirtualObjectShadow.Draw(viewmtx, projmtx, lightIntensity);
+                    //mVirtualObjectShadow.Draw(viewmtx, projmtx, lightIntensity);
                 }
 
             }
@@ -408,6 +433,25 @@ namespace HelloAR
         public bool OnTouch(View v, MotionEvent e)
         {
             return mGestureDetector.OnTouchEvent(e);
+        }
+
+        private int LoadTexture(Android.Graphics.Bitmap bitmap)
+        {
+            int[] textures = new int[1];
+            GLES20.GlGenTextures(1, textures, 0);
+
+            int textureId = textures[0];
+            GLES20.GlBindTexture(GLES20.GlTexture2d, textureId);
+
+            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureMinFilter, GLES20.GlLinearMipmapLinear);
+            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureMagFilter, GLES20.GlLinear);
+            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapS, GLES20.GlClampToEdge);
+            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapT, GLES20.GlClampToEdge);
+
+            GLUtils.TexImage2D(GLES20.GlTexture2d, 0, bitmap, 0);
+            GLES20.GlGenerateMipmap(GLES20.GlTexture2d);
+
+            return textureId;
         }
 
     }
