@@ -195,16 +195,23 @@ namespace HelloAR
 				mVertexBuffer.Put(x * xScale);
 				mVertexBuffer.Put(z * zScale);
 				mVertexBuffer.Put(1.0f);
-			}
+            }
 
-			// step 1, perimeter
-			mIndexBuffer.Put((short)((boundaryVertices - 1) * 2));
-			for (int i = 0; i < boundaryVertices; ++i)
+
+            // step 1, perimeter
+            mIndexBuffer.Put((short)((boundaryVertices - 1) * 2));
+			/*for (int i = 0; i < boundaryVertices; ++i)
 			{
 				mIndexBuffer.Put((short)(i * 2));
 				mIndexBuffer.Put((short)(i * 2 + 1));
-			}
-			mIndexBuffer.Put((short)1);
+			}*/
+            for (int i = 0; i < boundaryVertices - 1; ++i)
+            {
+                mIndexBuffer.Put((short)(i));
+                mIndexBuffer.Put((short)(i + 1));
+            }
+
+            mIndexBuffer.Put((short)1);
 			// This leaves us on the interior edge of the perimeter between the inset vertices
 			// for boundary verts n-1 and 0.
 

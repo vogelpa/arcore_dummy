@@ -211,7 +211,9 @@ namespace HelloAR
             // Prepare the other rendering objects.
             try
             {
-                mVirtualObject.CreateOnGlThread(/*context=*/this, "2D.obj", "black_x.png");
+                mVirtualObject.CreateOnGlThread(this, "2D.obj", "black_x.png");
+                //mVirtualObject.CreateOnGlThread(/*context=*/this, "andy.obj", "andy.png");
+
                 //mVirtualObject.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
                 mVirtualObject.SetBlendMode(ObjectRenderer.BlendMode.Grid);
 
@@ -228,6 +230,7 @@ namespace HelloAR
             try
             {
                 mPlaneRenderer.CreateOnGlThread(/*context=*/this, "trigrid.png");
+                //mPlaneRenderer.CreateOnGlThread(/*context=*/this, "black_x.png");
             }
             catch (Java.IO.IOException e)
             {
@@ -333,11 +336,11 @@ namespace HelloAR
 
                     if (frameCounter % 25 == 0)
                     {
-                        planeHitResults.Add(PlaneDivider.DividePlaneIntoCells(frame, plane));
+                        //planeHitResults.Add(PlaneDivider.DividePlaneIntoCells(frame, plane));
                     }
                 }
 
-                if (frameCounter % 25 == 0) { 
+                /*if (frameCounter % 25 == 0) { 
                     mAnchors.Clear();
 
                     foreach (var singlePlaneHitResults in planeHitResults)
@@ -347,7 +350,7 @@ namespace HelloAR
                             mAnchors.Add(hit.CreateAnchor());
                         }
                     }
-                }
+                }*/
 
                 // Check if we detected at least one plane. If so, hide the loading message.
                 if (mLoadingMessageSnackbar != null)
