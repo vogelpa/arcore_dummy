@@ -1,6 +1,7 @@
 ﻿using System;
 using Android.Content;
 using Android.Graphics;
+using Android.Media;
 using Android.Opengl;
 using Java.Nio;
 using JavaGl.Obj;
@@ -196,12 +197,149 @@ namespace HelloAR
 			Android.Opengl.Matrix.SetIdentityM(mModelMatrix, 0);
 		}
 
-		/**
+        public void CreateOnGlThreadImage(Context context, string objAssetName, Image image)
+        {
+            // Convert the Image to a Bitmap.
+            Bitmap textureBitmap = convertImageToBitmap(image);
+
+            GLES20.GlActiveTexture(GLES20.GlTexture0);
+            GLES20.GlGenTextures(mTextures.Length, mTextures, 0);
+            GLES20.GlBindTexture(GLES20.GlTexture2d, mTextures[0]);
+
+            GLES20.GlTexParameteri(GLES20.GlTexture2d,
+                GLES20.GlTextureMinFilter, GLES20.GlLinearMipmapLinear);
+            GLES20.GlTexParameteri(GLES20.GlTexture2d,
+                GLES20.GlTextureMagFilter, GLES20.GlLinear);
+            GLUtils.TexImage2D(GLES20.GlTexture2d, 0, textureBitmap, 0);
+            GLES20.GlGenerateMipmap(GLES20.GlTexture2d);
+            GLES20.GlBindTexture(GLES20.GlTexture2d, 0);
+
+            textureBitmap.Recycle();
+
+            ShaderUtil.CheckGLError(TAG, "Texture loading");
+
+            // Read the obj file.
+            var objInputStream = context.Assets.Open(objAssetName);
+            var obj = ObjReader.Read(objInputStream);
+
+            // Prepare the Obj so that its structure is suitable for
+            // rendering with OpenGL:
+            // 1. Triangulate it
+            // 2. Make sure that texture coordinates are not ambiguous
+            // 3. Make sure that normals are not ambiguous
+            // 4. Convert it to single-indexed data
+            obj = ObjUtils.ConvertToRenderable(obj);
+
+            // OpenGL does not use Java arrays. ByteBuffers are used instead to provide data in a format
+            // that OpenGL understands.
+
+            // Obtain the data from the OBJ, as direct buffers:
+            IntBuffer wideIndices = ObjData.GetFaceVertexIndices(obj, 3);
+            FloatBuffer vertices = ObjData.GetVertices(obj);
+            FloatBuffer texCoords = ObjData.GetTexCoords(obj, 2);
+            FloatBuffer normals = ObjData.GetNormals(obj);
+
+            // Convert int indices to shorts for GL ES 2.0 compatibility
+            ShortBuffer indices = ByteBuffer.AllocateDirect(2 * wideIndices.Limit())
+                .Order(ByteOrder.NativeOrder()).AsShortBuffer();
+            while (wideIndices.HasRemaining)
+            {
+                indices.Put((short)wideIndices.Get());
+            }
+            indices.Rewind();
+
+            var buffers = new int[2];
+            GLES20.GlGenBuffers(2, buffers, 0);
+            mVertexBufferId = buffers[0];
+            mIndexBufferId = buffers[1];
+
+            // Load vertex buffer
+            mVerticesBaseAddress = 0;
+            mTexCoordsBaseAddress = mVerticesBaseAddress + 4 * vertices.Limit();
+            mNormalsBaseAddress = mTexCoordsBaseAddress + 4 * texCoords.Limit();
+            int totalBytes = mNormalsBaseAddress + 4 * normals.Limit();
+
+            GLES20.GlBindBuffer(GLES20.GlArrayBuffer, mVertexBufferId);
+            GLES20.GlBufferData(GLES20.GlArrayBuffer, totalBytes, null, GLES20.GlStaticDraw);
+            GLES20.GlBufferSubData(
+                GLES20.GlArrayBuffer, mVerticesBaseAddress, 4 * vertices.Limit(), vertices);
+            GLES20.GlBufferSubData(
+                GLES20.GlArrayBuffer, mTexCoordsBaseAddress, 4 * texCoords.Limit(), texCoords);
+            GLES20.GlBufferSubData(
+                GLES20.GlArrayBuffer, mNormalsBaseAddress, 4 * normals.Limit(), normals);
+            GLES20.GlBindBuffer(GLES20.GlArrayBuffer, 0);
+
+            // Load index buffer
+            GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, mIndexBufferId);
+            mIndexCount = indices.Limit();
+            GLES20.GlBufferData(
+                GLES20.GlElementArrayBuffer, 2 * mIndexCount, indices, GLES20.GlStaticDraw);
+            GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, 0);
+
+            ShaderUtil.CheckGLError(TAG, "OBJ buffer load");
+
+            int vertexShader = ShaderUtil.LoadGLShader(TAG, context,
+                    GLES20.GlVertexShader, Resource.Raw.object_vertex);
+            int fragmentShader = ShaderUtil.LoadGLShader(TAG, context,
+                GLES20.GlFragmentShader, Resource.Raw.object_fragment);
+
+            mProgram = GLES20.GlCreateProgram();
+            GLES20.GlAttachShader(mProgram, vertexShader);
+            GLES20.GlAttachShader(mProgram, fragmentShader);
+            GLES20.GlLinkProgram(mProgram);
+            GLES20.GlUseProgram(mProgram);
+
+            ShaderUtil.CheckGLError(TAG, "Program creation");
+
+            mModelViewUniform = GLES20.GlGetUniformLocation(mProgram, "u_ModelView");
+            mModelViewProjectionUniform =
+                GLES20.GlGetUniformLocation(mProgram, "u_ModelViewProjection");
+
+            mPositionAttribute = GLES20.GlGetAttribLocation(mProgram, "a_Position");
+            mNormalAttribute = GLES20.GlGetAttribLocation(mProgram, "a_Normal");
+            mTexCoordAttribute = GLES20.GlGetAttribLocation(mProgram, "a_TexCoord");
+
+            mTextureUniform = GLES20.GlGetUniformLocation(mProgram, "u_Texture");
+
+            mLightingParametersUniform = GLES20.GlGetUniformLocation(mProgram, "u_LightingParameters");
+            mMaterialParametersUniform = GLES20.GlGetUniformLocation(mProgram, "u_MaterialParameters");
+
+            ShaderUtil.CheckGLError(TAG, "Program parameters");
+
+            Android.Opengl.Matrix.SetIdentityM(mModelMatrix, 0);
+        }
+
+        private Bitmap convertImageToBitmap(Image image)
+        {
+            // Get the three planes from the Image.
+            Image.Plane[] planes = image.GetPlanes();
+
+            // Convert the YUV_420_888 image to RGB.
+            byte[] rgbBytes = convertYUV420ToRGB(planes[0].Buffer, planes[1].Buffer, planes[2].Buffer,
+                image.Width, image.Height);
+
+            // Create a Bitmap from the RGB data.
+            Bitmap bitmap = Bitmap.CreateBitmap(image.Width, image.Height, Bitmap.Config.Argb8888);
+            bitmap.CopyPixelsFromBuffer(ByteBuffer.Wrap(rgbBytes));
+
+            return bitmap;
+        }
+
+        private byte[] convertYUV420ToRGB(ByteBuffer yBuffer, ByteBuffer uBuffer, ByteBuffer vBuffer,
+                                          int width, int height)
+        {
+            // TODO: Implement this function. You will need to handle the conversion from YUV to RGB.
+            // This can be quite complex, so you might want to look for a library or code snippet online
+            // that can do this for you.
+            return null;
+        }
+
+        /**
 		 * Selects the blending mode for rendering.
 		 *
 		 * @param blendMode The blending mode.  Null indicates no blending (opaque rendering).
 		 */
-		public void SetBlendMode(BlendMode blendMode)
+        public void SetBlendMode(BlendMode blendMode)
 		{
 			mBlendMode = blendMode;
 		}

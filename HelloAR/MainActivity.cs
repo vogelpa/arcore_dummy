@@ -3,18 +3,22 @@ using Android.Support.V7.App;
 using Android.Widget;
 using Android.OS;
 using Android.Opengl;
+using Android.Media;
 using Google.AR.Core;
 using Android.Util;
+using Java.Interop;
 using Javax.Microedition.Khronos.Opengles;
 using Android.Support.Design.Widget;
 using System.Collections.Generic;
 using Android.Views;
 using Android.Support.V4.Content;
 using Android.Support.V4.App;
+using Javax.Microedition.Khronos.Egl;
 using System.Collections.Concurrent;
 using System;
 using Google.AR.Core.Exceptions;
-using UnityEngine.XR;
+using Java.Util.Concurrent;
+using Org.W3c.Dom;
 
 namespace HelloAR
 {
@@ -22,7 +26,7 @@ namespace HelloAR
     public class MainActivity : AppCompatActivity, GLSurfaceView.IRenderer, Android.Views.View.IOnTouchListener
     {
         const string TAG = "HELLO-AR";
-        
+
         // Rendering. The Renderers are created here, and initialized when the GL surface is created.
         GLSurfaceView mSurfaceView;
 
@@ -33,10 +37,11 @@ namespace HelloAR
         DisplayRotationHelper mDisplayRotationHelper;
 
         ObjectRenderer mVirtualObject = new ObjectRenderer();
+        ObjectRenderer mVirtualImage = new ObjectRenderer();
         ObjectRenderer mVirtualObjectShadow = new ObjectRenderer();
         PlaneRenderer mPlaneRenderer = new PlaneRenderer();
         PointCloudRenderer mPointCloud = new PointCloudRenderer();
-
+        int frameCounter = 0;
         // Temporary matrix allocated here to reduce number of allocations for each frame.
         static float[] mAnchorMatrix = new float[16];
 
@@ -44,7 +49,11 @@ namespace HelloAR
 
         // Tap handling and UI.
         List<Anchor> mAnchors = new List<Anchor>();
-        int frameCounter = 0;
+
+        List<Anchor> mImageAnchors = new List<Anchor>();
+
+        List<Image> mImages = new List<Image>();
+
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
@@ -90,7 +99,6 @@ namespace HelloAR
 
             // Create default config, check is supported, create session from that config.
             var config = new Google.AR.Core.Config(mSession);
-            config.SetPlaneFindingMode(Google.AR.Core.Config.PlaneFindingMode.HorizontalAndVertical);
             if (!mSession.IsSupported(config))
             {
                 Toast.MakeText(this, "This device does not support AR", ToastLength.Long).Show();
@@ -211,16 +219,14 @@ namespace HelloAR
             // Prepare the other rendering objects.
             try
             {
-                mVirtualObject.CreateOnGlThread(this, "2D.obj", "black_x.png");
-                //mVirtualObject.CreateOnGlThread(/*context=*/this, "andy.obj", "andy.png");
+                mVirtualObject.CreateOnGlThread(/*context=*/this, "Ellipsoid.obj", "andy.png");//, "andy.png");
+                //mVirtualObject.CreateOnGlThread(/*context=*/this, "Ellipsoid.obj", "blue.png");//, "andy.png");
+                mVirtualObject.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
 
-                //mVirtualObject.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
-                mVirtualObject.SetBlendMode(ObjectRenderer.BlendMode.Grid);
-
-                //mVirtualObjectShadow.CreateOnGlThread(/*context=*/this,
-                //    "andy_shadow.obj", "andy_shadow.png");
-                //mVirtualObjectShadow.SetBlendMode(ObjectRenderer.BlendMode.Shadow);
-                //mVirtualObjectShadow.setMaterialProperties(1.0f, 0.0f, 0.0f, 1.0f);
+                mVirtualObjectShadow.CreateOnGlThread(/*context=*/this,
+                    "andy_shadow.obj", "andy_shadow.png");
+                mVirtualObjectShadow.SetBlendMode(ObjectRenderer.BlendMode.Shadow);
+                mVirtualObjectShadow.setMaterialProperties(1.0f, 0.0f, 0.0f, 1.0f);
             }
             catch (Java.IO.IOException e)
             {
@@ -230,7 +236,6 @@ namespace HelloAR
             try
             {
                 mPlaneRenderer.CreateOnGlThread(/*context=*/this, "trigrid.png");
-                //mPlaneRenderer.CreateOnGlThread(/*context=*/this, "black_x.png");
             }
             catch (Java.IO.IOException e)
             {
@@ -247,7 +252,6 @@ namespace HelloAR
 
         public void OnDrawFrame(IGL10 gl)
         {
-            frameCounter++;
             // Clear screen to notify driver it should not load any pixels from previous frame.
             GLES20.GlClear(GLES20.GlColorBufferBit | GLES20.GlDepthBufferBit);
 
@@ -275,24 +279,42 @@ namespace HelloAR
                 {
                     foreach (var hit in frame.HitTest(tap))
                     {
-
                         var trackable = hit.Trackable;
-                        //if (trackable is Point)
-                        //{
+
                         // Check if any plane was hit, and if it was hit inside the plane polygon.
-                        //if (trackable is Plane && ((Plane)trackable).IsPoseInPolygon(hit.HitPose))
-                        //{
+                        if (trackable is Plane && ((Plane)trackable).IsPoseInPolygon(hit.HitPose))
+                        {
+                            // Cap the number of objects created. This avoids overloading both the
+                            // rendering system and ARCore.
+                            if (mAnchors.Count >= 16)
+                            {
+                                mAnchors[0].Detach();
+                                mAnchors.RemoveAt(0);
+                            }
+                            // Adding an Anchor tells ARCore that it should track this position in
+                            // space.  This anchor is created on the Plane to place the 3d model
+                            // in the correct position relative to both the world and to the plane
+                            mAnchors.Add(hit.CreateAnchor());
 
-                        // Adding an Anchor tells ARCore that it should track this position in
-                        // space.  This anchor is created on the Plane to place the 3d model
-                        // in the correct position relative to both the world and to the plane
-                        mAnchors.Add(hit.CreateAnchor());
-
-                        // Hits are sorted by depth. Consider only closest hit on a plane.
-                        break;
-                        //}
-                        //}
+                            // Hits are sorted by depth. Consider only closest hit on a plane.
+                            break;
+                        }
                     }
+                }
+
+                
+                if ( frameCounter++ % 50  == 20)
+                {
+                    Pose pose = frame.Camera.Pose;
+                    // Adjust the pose to be 1 meter below the camera.
+                    float[] translation = pose.GetTranslation();
+                    translation[1] -= 2.0f; // Assuming Y-axis is up.
+
+                    // Create the adjusted pose.
+                    var adjustedPose = new Pose(translation, pose.GetRotationQuaternion());
+                    Anchor anchor = mSession.CreateAnchor(adjustedPose);
+                    //mAnchors.Add(anchor);
+                    floatingPictures(frame);
                 }
 
                 // Draw background.
@@ -322,35 +344,11 @@ namespace HelloAR
                 pointCloud.Release();
 
                 var planes = new List<Plane>();
-                var planeHitResults = new List<List<HitResult>>();
-
-
                 foreach (var p in mSession.GetAllTrackables(Java.Lang.Class.FromType(typeof(Plane))))
                 {
-
                     var plane = (Plane)p;
-                    if (plane.SubsumedBy == null)
-                    {
-                        planes.Add(plane);
-                    }
-
-                    if (frameCounter % 25 == 0)
-                    {
-                        //planeHitResults.Add(PlaneDivider.DividePlaneIntoCells(frame, plane));
-                    }
+                    planes.Add(plane);
                 }
-
-                /*if (frameCounter % 25 == 0) { 
-                    mAnchors.Clear();
-
-                    foreach (var singlePlaneHitResults in planeHitResults)
-                    {
-                        foreach (var hit in singlePlaneHitResults)
-                        {
-                            mAnchors.Add(hit.CreateAnchor());
-                        }
-                    }
-                }*/
 
                 // Check if we detected at least one plane. If so, hide the loading message.
                 if (mLoadingMessageSnackbar != null)
@@ -368,12 +366,9 @@ namespace HelloAR
 
                 // Visualize planes.
                 mPlaneRenderer.DrawPlanes(planes, camera.DisplayOrientedPose, projmtx);
-                //Projection.GetMeshFromFrame(frame);
-
-                //RunBPAlg runBPAlg = go.AddComponent<RunBPAlg>();
 
                 // Visualize anchors created by touch.
-                float scaleFactor = 0.05f;
+                float scaleFactor = 0.2f;
                 foreach (var anchor in mAnchors)
                 {
                     if (anchor.TrackingState != TrackingState.Tracking)
@@ -390,7 +385,23 @@ namespace HelloAR
                     mVirtualObject.Draw(viewmtx, projmtx, lightIntensity);
                     //mVirtualObjectShadow.Draw(viewmtx, projmtx, lightIntensity);
                 }
+                foreach (var imageAnchor in mImageAnchors)
+                {
+                    if (imageAnchor.TrackingState != TrackingState.Tracking)
+                        continue;
 
+
+                    mVirtualImage.CreateOnGlThreadImage(/*context=*/this, "2D.obj", mImages[0]);
+                    //mVirtualImage.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
+
+                    // Get the current combined pose of an Anchor and Plane in world space. The Anchor
+                    // and Plane poses are updated during calls to session.update() as ARCore refines
+                    // its estimate of the world.
+                    imageAnchor.Pose.ToMatrix(mAnchorMatrix, 0);
+                    // Update and draw the model and its shadow.
+                    mVirtualImage.updateModelMatrix(mAnchorMatrix, scaleFactor);
+                    mVirtualImage.Draw(viewmtx, projmtx, lightIntensity);
+                }
             }
             catch (System.Exception ex)
             {
@@ -399,6 +410,49 @@ namespace HelloAR
             }
         }
 
+        private void floatingPictures(Frame frame)
+        {
+            // Capture the camera image.
+            Camera camera = frame.Camera;
+            Image image = frame.AcquireCameraImage();
+
+            // Save the image as a texture.
+            //Texture texture =  // Implement this to convert the image to a texture.
+
+            // Create a quad to display the image.
+            Pose pose = camera.DisplayOrientedPose;
+            Anchor anchor = mSession.CreateAnchor(pose);
+            /*RenderableDefinition definition = RenderableDefinition.builder()
+                    .setVertices(
+                            // Vertex coordinates in meters. 1 unit = 1 meter
+                            Arrays.asList(
+                                    Vertex.builder().setPosition(new Vector3(-0.5f, 0, 0)).build(),
+                                    Vertex.builder().setPosition(new Vector3(0.5f, 0, 0)).build(),
+                                    Vertex.builder().setPosition(new Vector3(-0.5f, 1, 0)).build(),
+                                    Vertex.builder().setPosition(new Vector3(0.5f, 1, 0)).build()
+                            )
+                    )
+                    .setTriangles(
+                            Arrays.asList(
+                                    Triangle.builder().setVertices(0, 1, 2).build(),
+                                    Triangle.builder().setVertices(1, 3, 2).build()
+                            )
+                    )
+                    .setMaterial(Material.builder().setSource(()->CompletableFuture.completedFuture(texture)).build())
+                    .build();
+            ModelRenderable renderable = ModelRenderable.builder()
+                    .setSource(CompletableFuture.completedFuture(definition))
+                    .build()
+                    .get();
+            */
+            // Anchor the quad in the world.
+            mImageAnchors.Add(anchor);
+            mImages.Add(image);
+            /*Node node = new AnchorNode(anchor);
+            node.setRenderable(renderable);
+            node.setParent(arFragment.getArSceneView().getScene());*/
+
+        }
         private void showLoadingMessage()
         {
             this.RunOnUiThread(() =>
@@ -422,7 +476,7 @@ namespace HelloAR
                 mLoadingMessageSnackbar.Show();
             });
         }
-    
+
         private void hideLoadingMessage()
         {
             this.RunOnUiThread(() =>
@@ -437,26 +491,6 @@ namespace HelloAR
         {
             return mGestureDetector.OnTouchEvent(e);
         }
-
-        private int LoadTexture(Android.Graphics.Bitmap bitmap)
-        {
-            int[] textures = new int[1];
-            GLES20.GlGenTextures(1, textures, 0);
-
-            int textureId = textures[0];
-            GLES20.GlBindTexture(GLES20.GlTexture2d, textureId);
-
-            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureMinFilter, GLES20.GlLinearMipmapLinear);
-            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureMagFilter, GLES20.GlLinear);
-            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapS, GLES20.GlClampToEdge);
-            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapT, GLES20.GlClampToEdge);
-
-            GLUtils.TexImage2D(GLES20.GlTexture2d, 0, bitmap, 0);
-            GLES20.GlGenerateMipmap(GLES20.GlTexture2d);
-
-            return textureId;
-        }
-
     }
 
     class SimpleTapGestureDetector : GestureDetector.SimpleOnGestureListener
