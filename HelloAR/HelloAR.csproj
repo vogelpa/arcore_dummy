@@ -33,7 +33,7 @@
     <EnableLLVM>false</EnableLLVM>
     <BundleAssemblies>false</BundleAssemblies>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <EmbedAssembliesIntoApk>false</EmbedAssembliesIntoApk>
     <Debugger>Xamarin</Debugger>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -118,17 +118,7 @@
   <ItemGroup>
     <Compile Include="PathTracking.cs" />
     <Compile Include="MainActivity.cs" />
-    <Compile Include="Rendering\BallPivoting\BallPivotingAlgorithm.cs" />
-    <Compile Include="Rendering\BallPivoting\Delaunay.cs" />
-    <Compile Include="Rendering\BallPivoting\FlyCamera.cs" />
-    <Compile Include="Rendering\CellRenderer.cs" />
-    <Compile Include="Rendering\PlaneDivider.cs" />
-    <Compile Include="Rendering\Projection.cs" />
     <Compile Include="Rendering\GridRenderer.cs" />
-    <Compile Include="Rendering\BallPivoting\OcTree.cs" />
-    <Compile Include="Rendering\BallPivoting\PointCloud.cs" />
-    <Compile Include="Rendering\BallPivoting\RunBPAlg.cs" />
-    <Compile Include="Rendering\BallPivoting\VoxelRenderer.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rendering\ShaderUtil.cs" />
