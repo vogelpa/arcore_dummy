@@ -36,20 +36,15 @@ namespace HelloAR
         Snackbar mLoadingMessageSnackbar = null;
         DisplayRotationHelper mDisplayRotationHelper;
 
-        ObjectRenderer mVirtualObject = new ObjectRenderer();
         ObjectRenderer mVirtualImage = new ObjectRenderer();
-        ObjectRenderer mVirtualObjectShadow = new ObjectRenderer();
         PlaneRenderer mPlaneRenderer = new PlaneRenderer();
         PointCloudRenderer mPointCloud = new PointCloudRenderer();
-        int frameCounter = 0;
         // Temporary matrix allocated here to reduce number of allocations for each frame.
         static float[] mAnchorMatrix = new float[16];
 
         ConcurrentQueue<MotionEvent> mQueuedSingleTaps = new ConcurrentQueue<MotionEvent>();
 
         // Tap handling and UI.
-        List<Anchor> mAnchors = new List<Anchor>();
-
         List<Anchor> mImageAnchors = new List<Anchor>();
 
         List<Image> mImages = new List<Image>();
@@ -219,14 +214,10 @@ namespace HelloAR
             // Prepare the other rendering objects.
             try
             {
-                mVirtualObject.CreateOnGlThread(/*context=*/this, "Ellipsoid.obj", "andy.png");//, "andy.png");
-                //mVirtualObject.CreateOnGlThread(/*context=*/this, "Ellipsoid.obj", "blue.png");//, "andy.png");
-                mVirtualObject.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
+               
+                mVirtualImage.CreateOnGlThread(/*context=*/this, "2D.obj", "andy.png");
+                //mVirtualImage.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
 
-                mVirtualObjectShadow.CreateOnGlThread(/*context=*/this,
-                    "andy_shadow.obj", "andy_shadow.png");
-                mVirtualObjectShadow.SetBlendMode(ObjectRenderer.BlendMode.Shadow);
-                mVirtualObjectShadow.setMaterialProperties(1.0f, 0.0f, 0.0f, 1.0f);
             }
             catch (Java.IO.IOException e)
             {
@@ -275,47 +266,11 @@ namespace HelloAR
                 MotionEvent tap = null;
                 mQueuedSingleTaps.TryDequeue(out tap);
 
+                // Add a floating image if we tap and are in tracking state
                 if (tap != null && camera.TrackingState == TrackingState.Tracking)
                 {
-                    foreach (var hit in frame.HitTest(tap))
-                    {
-                        var trackable = hit.Trackable;
-
-                        // Check if any plane was hit, and if it was hit inside the plane polygon.
-                        if (trackable is Plane && ((Plane)trackable).IsPoseInPolygon(hit.HitPose))
-                        {
-                            // Cap the number of objects created. This avoids overloading both the
-                            // rendering system and ARCore.
-                            if (mAnchors.Count >= 16)
-                            {
-                                mAnchors[0].Detach();
-                                mAnchors.RemoveAt(0);
-                            }
-                            // Adding an Anchor tells ARCore that it should track this position in
-                            // space.  This anchor is created on the Plane to place the 3d model
-                            // in the correct position relative to both the world and to the plane
-                            mAnchors.Add(hit.CreateAnchor());
-
-                            // Hits are sorted by depth. Consider only closest hit on a plane.
-                            break;
-                        }
-                    }
-                }
-
-                
-                if ( frameCounter++ % 50  == 20)
-                {
-                    Pose pose = frame.Camera.Pose;
-                    // Adjust the pose to be 1 meter below the camera.
-                    float[] translation = pose.GetTranslation();
-                    translation[1] -= 2.0f; // Assuming Y-axis is up.
-
-                    // Create the adjusted pose.
-                    var adjustedPose = new Pose(translation, pose.GetRotationQuaternion());
-                    Anchor anchor = mSession.CreateAnchor(adjustedPose);
-                    //mAnchors.Add(anchor);
-                    floatingPictures(frame);
-                }
+                    floatingPictures(frame);                    
+                }  
 
                 // Draw background.
                 mBackgroundRenderer.Draw(frame);
@@ -368,31 +323,11 @@ namespace HelloAR
                 mPlaneRenderer.DrawPlanes(planes, camera.DisplayOrientedPose, projmtx);
 
                 // Visualize anchors created by touch.
-                float scaleFactor = 0.2f;
-                foreach (var anchor in mAnchors)
-                {
-                    if (anchor.TrackingState != TrackingState.Tracking)
-                        continue;
-
-                    // Get the current combined pose of an Anchor and Plane in world space. The Anchor
-                    // and Plane poses are updated during calls to session.update() as ARCore refines
-                    // its estimate of the world.
-                    anchor.Pose.ToMatrix(mAnchorMatrix, 0);
-
-                    // Update and draw the model and its shadow.
-                    mVirtualObject.updateModelMatrix(mAnchorMatrix, scaleFactor);
-                    //mVirtualObjectShadow.updateModelMatrix(mAnchorMatrix, scaleFactor);
-                    mVirtualObject.Draw(viewmtx, projmtx, lightIntensity);
-                    //mVirtualObjectShadow.Draw(viewmtx, projmtx, lightIntensity);
-                }
+                float scaleFactor =  0.005f;
                 foreach (var imageAnchor in mImageAnchors)
                 {
                     if (imageAnchor.TrackingState != TrackingState.Tracking)
                         continue;
-
-
-                    mVirtualImage.CreateOnGlThreadImage(/*context=*/this, "2D.obj", mImages[0]);
-                    //mVirtualImage.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
 
                     // Get the current combined pose of an Anchor and Plane in world space. The Anchor
                     // and Plane poses are updated during calls to session.update() as ARCore refines
@@ -403,6 +338,7 @@ namespace HelloAR
                     mVirtualImage.Draw(viewmtx, projmtx, lightIntensity);
                 }
             }
+
             catch (System.Exception ex)
             {
                 // Avoid crashing the application due to unhandled exceptions.
@@ -414,44 +350,22 @@ namespace HelloAR
         {
             // Capture the camera image.
             Camera camera = frame.Camera;
-            Image image = frame.AcquireCameraImage();
+            //Image image = frame.AcquireCameraImage();
 
-            // Save the image as a texture.
-            //Texture texture =  // Implement this to convert the image to a texture.
-
-            // Create a quad to display the image.
             Pose pose = camera.DisplayOrientedPose;
+
+            float[] translation = pose.GetTranslation();
+            translation[2] = 0.5f; // Assuming Z-axis is up.
+
+            // Create the adjusted pose.
+            var adjustedPose = new Pose(translation, pose.GetRotationQuaternion());
+            
+            // Create a quad to display the image.
             Anchor anchor = mSession.CreateAnchor(pose);
-            /*RenderableDefinition definition = RenderableDefinition.builder()
-                    .setVertices(
-                            // Vertex coordinates in meters. 1 unit = 1 meter
-                            Arrays.asList(
-                                    Vertex.builder().setPosition(new Vector3(-0.5f, 0, 0)).build(),
-                                    Vertex.builder().setPosition(new Vector3(0.5f, 0, 0)).build(),
-                                    Vertex.builder().setPosition(new Vector3(-0.5f, 1, 0)).build(),
-                                    Vertex.builder().setPosition(new Vector3(0.5f, 1, 0)).build()
-                            )
-                    )
-                    .setTriangles(
-                            Arrays.asList(
-                                    Triangle.builder().setVertices(0, 1, 2).build(),
-                                    Triangle.builder().setVertices(1, 3, 2).build()
-                            )
-                    )
-                    .setMaterial(Material.builder().setSource(()->CompletableFuture.completedFuture(texture)).build())
-                    .build();
-            ModelRenderable renderable = ModelRenderable.builder()
-                    .setSource(CompletableFuture.completedFuture(definition))
-                    .build()
-                    .get();
-            */
+    
             // Anchor the quad in the world.
             mImageAnchors.Add(anchor);
-            mImages.Add(image);
-            /*Node node = new AnchorNode(anchor);
-            node.setRenderable(renderable);
-            node.setParent(arFragment.getArSceneView().getScene());*/
-
+            //mImages.Add(image);
         }
         private void showLoadingMessage()
         {

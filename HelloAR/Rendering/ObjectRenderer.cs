@@ -199,8 +199,30 @@ namespace HelloAR
 
         public void CreateOnGlThreadImage(Context context, string objAssetName, Image image)
         {
+            int w = 1080;
+            int h = 2220;
+            int[] b = new int[w*(0+h)];
+            int[] bt = new int[w*h];
+            IntBuffer ib = IntBuffer.Wrap(b);
+            ib.Position(0);
+            GLES20.GlReadPixels(0, 0, w, h, GLES20.GlRgba, GLES20.GlUnsignedByte, ib);
+
+            for (int i = 0, k = 0; i<h; i++, k++)
+            {//remember, that OpenGL bitmap is incompatible with Android bitmap
+             //and so, some correction need.
+                for (int j = 0; j<w; j++)
+                {
+                    int pix = b[i*w+j];
+                    int pb = (pix>>16)&0xff;
+                    int pr = (pix<<16)&0x00ff0000;
+                    int pix1 = (int)((pix&0xff00ff00) | pr | pb);
+                    bt[(h-k-1)*w+j]=pix1;
+                }
+            }
+
+            Bitmap textureBitmap = Bitmap.CreateBitmap(bt, w, h, Bitmap.Config.Argb8888);
             // Convert the Image to a Bitmap.
-            Bitmap textureBitmap = convertImageToBitmap(image);
+            //Bitmap textureBitmap = convertImageToBitmap(image);
 
             GLES20.GlActiveTexture(GLES20.GlTexture0);
             GLES20.GlGenTextures(mTextures.Length, mTextures, 0);
@@ -402,9 +424,12 @@ namespace HelloAR
 			Android.Opengl.Matrix.MultiplyMM(mModelViewProjectionMatrix, 0, cameraPerspective, 0, mModelViewMatrix, 0);
 
 			GLES20.GlUseProgram(mProgram);
+            
+			int alphaUniform = GLES20.GlGetUniformLocation(mProgram, "u_Alpha");
+            GLES20.GlUniform1f(alphaUniform, 0.2f);
 
-			// Set the lighting environment properties.
-			Android.Opengl.Matrix.MultiplyMV(mViewLightDirection, 0, mModelViewMatrix, 0, LIGHT_DIRECTION, 0);
+            // Set the lighting environment properties.
+            Android.Opengl.Matrix.MultiplyMV(mViewLightDirection, 0, mModelViewMatrix, 0, LIGHT_DIRECTION, 0);
 			normalizeVec3(mViewLightDirection);
 			GLES20.GlUniform4f(mLightingParametersUniform,
 				mViewLightDirection[0], mViewLightDirection[1], mViewLightDirection[2], lightIntensity);
@@ -471,9 +496,9 @@ namespace HelloAR
 			// Disable vertex arrays
 			GLES20.GlDisableVertexAttribArray(mPositionAttribute);
 			GLES20.GlDisableVertexAttribArray(mNormalAttribute);
-			GLES20.GlDisableVertexAttribArray(mTexCoordAttribute);
+			GLES20.GlDisableVertexAttribArray(mTexCoordAttribute);    
 
-			GLES20.GlBindTexture(GLES20.GlTexture2d, 0);
+            GLES20.GlBindTexture(GLES20.GlTexture2d, 0);
 
 			ShaderUtil.CheckGLError(TAG, "After draw");
 		}
