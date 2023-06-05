@@ -376,6 +376,7 @@ namespace HelloAR
             //mImageAnchors.Add(anchor);
             int textureId = createTextureFromImage(image);
             mImages.Add(textureId);
+            
         }
 
         public int createTextureFromImage(Image image)
