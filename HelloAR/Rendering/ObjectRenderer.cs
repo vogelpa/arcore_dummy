@@ -401,7 +401,7 @@ namespace HelloAR
 			mSpecularPower = specularPower;
 		}
 
-		/**
+        /**
 		 * Draws the model.
 		 *
 		 * @param cameraView  A 4x4 view matrix, in column-major order.
@@ -413,7 +413,7 @@ namespace HelloAR
 		 * @see #setMaterialProperties(float, float, float, float)
 		 * @see android.opengl.Matrix
 		 */
-		public void Draw(float[] cameraView, float[] cameraPerspective, float lightIntensity)
+		public void Draw(float[] cameraView, float[] cameraPerspective, float lightIntensity, int imageTextureId)
 		{
 
 			ShaderUtil.CheckGLError(TAG, "Before draw");
@@ -440,8 +440,8 @@ namespace HelloAR
 
 			// Attach the object texture.
 			GLES20.GlActiveTexture(GLES20.GlTexture0);
-			GLES20.GlBindTexture(GLES20.GlTexture2d, mTextures[0]);
-			GLES20.GlUniform1i(mTextureUniform, 0);
+            GLES20.GlBindTexture(GLES20.GlTexture2d, imageTextureId);
+            GLES20.GlUniform1i(mTextureUniform, 0);
 
 			// Set the vertex attributes.
 			GLES20.GlBindBuffer(GLES20.GlArrayBuffer, mVertexBufferId);
@@ -484,7 +484,8 @@ namespace HelloAR
 			}
 
 			GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, mIndexBufferId);
-			GLES20.GlDrawElements(GLES20.GlTriangles, mIndexCount, GLES20.GlUnsignedShort, 0);
+
+            GLES20.GlDrawElements(GLES20.GlTriangles, mIndexCount, GLES20.GlUnsignedShort, 0);
 			GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, 0);
 
 			if (mBlendMode != BlendMode.Null)

@@ -19,6 +19,8 @@ using System;
 using Google.AR.Core.Exceptions;
 using Java.Util.Concurrent;
 using Org.W3c.Dom;
+using Java.Nio;
+using System.Linq.Expressions;
 
 namespace HelloAR
 {
@@ -47,7 +49,7 @@ namespace HelloAR
         // Tap handling and UI.
         List<Anchor> mImageAnchors = new List<Anchor>();
 
-        List<Image> mImages = new List<Image>();
+        List<int> mImages = new List<int>();
 
 
         protected override void OnCreate(Bundle savedInstanceState)
@@ -323,9 +325,11 @@ namespace HelloAR
                 mPlaneRenderer.DrawPlanes(planes, camera.DisplayOrientedPose, projmtx);
 
                 // Visualize anchors created by touch.
-                float scaleFactor =  0.005f;
+                float scaleFactor =  0.01f;
+                int idx = -1;
                 foreach (var imageAnchor in mImageAnchors)
                 {
+                    idx++;
                     if (imageAnchor.TrackingState != TrackingState.Tracking)
                         continue;
 
@@ -335,7 +339,7 @@ namespace HelloAR
                     imageAnchor.Pose.ToMatrix(mAnchorMatrix, 0);
                     // Update and draw the model and its shadow.
                     mVirtualImage.updateModelMatrix(mAnchorMatrix, scaleFactor);
-                    mVirtualImage.Draw(viewmtx, projmtx, lightIntensity);
+                    mVirtualImage.Draw(viewmtx, projmtx, lightIntensity, mImages[idx]);
                 }
             }
 
@@ -350,7 +354,7 @@ namespace HelloAR
         {
             // Capture the camera image.
             Camera camera = frame.Camera;
-            //Image image = frame.AcquireCameraImage();
+            Image image = frame.AcquireCameraImage();
 
             Pose pose = camera.DisplayOrientedPose;
 
@@ -365,8 +369,30 @@ namespace HelloAR
     
             // Anchor the quad in the world.
             mImageAnchors.Add(anchor);
-            //mImages.Add(image);
+            int textureId = createTextureFromImage(image);
+            mImages.Add(textureId);
         }
+
+        public int createTextureFromImage(Image image)
+        {
+            int[] textures = new int[1];
+            GLES20.GlGenTextures(1, textures, 0);
+
+            int textureId = textures[0];
+            GLES20.GlBindTexture(GLES20.GlTexture2d, textureId);
+
+            // Set default texture parameters
+            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureMinFilter, GLES20.GlLinear);
+            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureMagFilter, GLES20.GlLinear);
+            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapS, GLES20.GlClampToEdge);
+            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapT, GLES20.GlClampToEdge);
+
+            ByteBuffer buffer = image.GetPlanes()[0].Buffer;
+            GLES20.GlTexImage2D(GLES20.GlTexture2d, 0, GLES20.GlLuminance, image.Width, image.Height, 0, GLES20.GlLuminance, GLES20.GlUnsignedByte, buffer);
+
+            return textureId;
+        }
+
         private void showLoadingMessage()
         {
             this.RunOnUiThread(() =>
