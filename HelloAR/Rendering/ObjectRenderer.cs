@@ -440,7 +440,7 @@ namespace HelloAR
 
 			// Attach the object texture.
 			GLES20.GlActiveTexture(GLES20.GlTexture0);
-            GLES20.GlBindTexture(GLES20.GlTexture2d, imageTextureId);
+            GLES20.GlBindTexture(GLES20.GlTexture2d, mTextures[0]);
             GLES20.GlUniform1i(mTextureUniform, 0);
 
 			// Set the vertex attributes.

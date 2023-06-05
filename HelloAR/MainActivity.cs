@@ -51,7 +51,8 @@ namespace HelloAR
 
         List<int> mImages = new List<int>();
 
-
+        List<float[]> mMatrices = new List<float[]>();
+        
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
@@ -327,18 +328,18 @@ namespace HelloAR
                 // Visualize anchors created by touch.
                 float scaleFactor =  0.01f;
                 int idx = -1;
-                foreach (var imageAnchor in mImageAnchors)
+                foreach (var matrix in mMatrices)
                 {
                     idx++;
-                    if (imageAnchor.TrackingState != TrackingState.Tracking)
+                    if (camera.TrackingState != TrackingState.Tracking)
                         continue;
 
                     // Get the current combined pose of an Anchor and Plane in world space. The Anchor
                     // and Plane poses are updated during calls to session.update() as ARCore refines
                     // its estimate of the world.
-                    imageAnchor.Pose.ToMatrix(mAnchorMatrix, 0);
+                    //imageAnchor.Pose.ToMatrix(mAnchorMatrix, 0);
                     // Update and draw the model and its shadow.
-                    mVirtualImage.updateModelMatrix(mAnchorMatrix, scaleFactor);
+                    mVirtualImage.updateModelMatrix(matrix, scaleFactor);
                     mVirtualImage.Draw(viewmtx, projmtx, lightIntensity, mImages[idx]);
                 }
             }
@@ -357,7 +358,11 @@ namespace HelloAR
             Image image = frame.AcquireCameraImage();
 
             Pose pose = camera.DisplayOrientedPose;
-
+            
+            float[] matrix = new float[16];
+            pose.ToMatrix(matrix, 0);
+            mMatrices.Add(matrix);
+            
             float[] translation = pose.GetTranslation();
             translation[2] = 0.5f; // Assuming Z-axis is up.
 
@@ -365,10 +370,10 @@ namespace HelloAR
             var adjustedPose = new Pose(translation, pose.GetRotationQuaternion());
             
             // Create a quad to display the image.
-            Anchor anchor = mSession.CreateAnchor(pose);
+            //Anchor anchor = mSession.CreateAnchor(pose);
     
             // Anchor the quad in the world.
-            mImageAnchors.Add(anchor);
+            //mImageAnchors.Add(anchor);
             int textureId = createTextureFromImage(image);
             mImages.Add(textureId);
         }
