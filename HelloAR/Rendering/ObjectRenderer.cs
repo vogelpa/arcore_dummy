@@ -466,24 +466,10 @@ namespace HelloAR
 			GLES20.GlEnableVertexAttribArray(mNormalAttribute);
 			GLES20.GlEnableVertexAttribArray(mTexCoordAttribute);
 
-			if (mBlendMode != BlendMode.Null)
-			{
-				GLES20.GlDepthMask(false);
-				GLES20.GlEnable(GLES20.GlBlend);
-				switch (mBlendMode)
-				{
-					case BlendMode.Shadow:
-						// Multiplicative blending function for Shadow.
-						GLES20.GlBlendFunc(GLES20.GlZero, GLES20.GlOneMinusSrcAlpha);
-						break;
-					case BlendMode.Grid:
-						// Grid, additive blending function.
-						GLES20.GlBlendFunc(GLES20.GlSrcAlpha, GLES20.GlOneMinusSrcAlpha);
-						break;
-				}
-			}
+            GLES20.GlEnable(GLES20.GlBlend);
+            GLES20.GlBlendFunc(GLES20.GlSrcAlpha, GLES20.GlOneMinusSrcAlpha);
 
-			GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, mIndexBufferId);
+            GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, mIndexBufferId);
 
             GLES20.GlDrawElements(GLES20.GlTriangles, mIndexCount, GLES20.GlUnsignedShort, 0);
 			GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, 0);

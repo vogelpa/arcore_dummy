@@ -21,6 +21,9 @@ using Java.Util.Concurrent;
 using Org.W3c.Dom;
 using Java.Nio;
 using System.Linq.Expressions;
+using HelloAR.YuvTools;
+using Swissualize.Droid.YuvTools;
+using System.Drawing.Imaging;
 
 namespace HelloAR
 {
@@ -52,7 +55,9 @@ namespace HelloAR
         List<int> mImages = new List<int>();
 
         List<float[]> mMatrices = new List<float[]>();
-        
+
+        YuvToRGBAConverter mYuvToRGBAConverter;
+
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
@@ -123,6 +128,7 @@ namespace HelloAR
             mSurfaceView.SetEGLConfigChooser(8, 8, 8, 8, 16, 0); // Alpha used for plane blending.
             mSurfaceView.SetRenderer(this);
             mSurfaceView.RenderMode = Rendermode.Continuously;
+            mYuvToRGBAConverter = new YuvToRGBAConverter(this);
         }
 
 
@@ -376,11 +382,18 @@ namespace HelloAR
             //mImageAnchors.Add(anchor);
             int textureId = createTextureFromImage(image);
             mImages.Add(textureId);
+            image.Close();
             
         }
 
         public int createTextureFromImage(Image image)
         {
+            Android.Graphics.Bitmap bitmap = Android.Graphics.Bitmap.CreateBitmap(image.Width, image.Height, Android.Graphics.Bitmap.Config.Argb8888);
+            mYuvToRGBAConverter.YuvToRGBA(image, ref bitmap);
+
+            ByteBuffer buffer = convertBitmapToByteBuffer(bitmap);
+
+
             int[] textures = new int[1];
             GLES20.GlGenTextures(1, textures, 0);
 
@@ -393,11 +406,33 @@ namespace HelloAR
             GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapS, GLES20.GlClampToEdge);
             GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapT, GLES20.GlClampToEdge);
 
-            ByteBuffer buffer = image.GetPlanes()[0].Buffer;
-            GLES20.GlTexImage2D(GLES20.GlTexture2d, 0, GLES20.GlLuminance, image.Width, image.Height, 0, GLES20.GlLuminance, GLES20.GlUnsignedByte, buffer);
+            // Load the bitmap into the bound texture.
+            GLES20.GlTexImage2D(GLES20.GlTexture2d, 0, GLES20.GlRgba, bitmap.Width, bitmap.Height, 0, GLES20.GlRgba, GLES20.GlUnsignedByte, buffer);
+            // ByteBuffer buffer = image.GetPlanes()[0].Buffer;
+            // GLES20.GlTexImage2D(GLES20.GlTexture2d, 0, GLES20.GlLuminance, image.Width, image.Height, 0, GLES20.GlLuminance, GLES20.GlUnsignedByte, buffer);
+            bitmap.Recycle();
+
 
             return textureId;
         }
+
+        public ByteBuffer convertBitmapToByteBuffer(Android.Graphics.Bitmap bitmap)
+        {
+            // Calculate the number of bytes in the Bitmap.
+            int bytes = bitmap.ByteCount;
+
+            // Create a new byte buffer.
+            ByteBuffer buffer = ByteBuffer.AllocateDirect(bytes);
+
+            // Populate the byte buffer with the bitmap's pixel data.
+            bitmap.CopyPixelsToBuffer(buffer);
+
+            // Rewind the byte buffer for reading.
+            buffer.Rewind();
+
+            return buffer;
+        }
+
 
         private void showLoadingMessage()
         {

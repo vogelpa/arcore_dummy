@@ -1,36 +1,19 @@
 #extension GL_OES_EGL_image_external : require
 precision mediump float;
 
-/* // grey
-uniform samplerExternalOES u_TextureY;
+//simplified
+/*
+uniform sampler2D u_Texture;
+uniform float u_Alpha;
 
 varying vec2 v_TexCoord;
 
 void main() {
-    float y = texture2D(u_TextureY, v_TexCoord).r;
-    gl_FragColor = vec4(y, y, y, 1.0);
-}*/
-
-
-/*// color converter (not working)
-uniform samplerExternalOES u_TextureY;
-uniform sampler2D u_TextureU;
-uniform sampler2D u_TextureV;
-
-varying vec2 v_TexCoord;
-
-void main() {
-    float y = texture2D(u_TextureY, v_TexCoord).r;
-    float u = texture2D(u_TextureU, v_TexCoord).r - 0.5;
-    float v = texture2D(u_TextureV, v_TexCoord).r - 0.5;
-
-    float r = y + 1.13983 * v;
-    float g = y - 0.39465 * u - 0.58060 * v;
-    float b = y + 2.03211 * u;
-
-    gl_FragColor = vec4(r, g, b, 0.5);
+    vec4 color = texture2D(u_Texture, v_TexCoord);
+    gl_FragColor = vec4(color.rgb, 0.7);
 }
 */
+
 
 // original
 
@@ -80,6 +63,6 @@ void main() {
             pow(specularStrength, materialSpecularPower);
 
     // Apply SRGB gamma before writing the fragment color.
-    gl_FragColor.a = objectColor.a;
+    gl_FragColor.a = 0.7;//objectColor.a;
     gl_FragColor.rgb = pow(objectColor.rgb * (ambient + diffuse) + specular, vec3(kGamma));
 }

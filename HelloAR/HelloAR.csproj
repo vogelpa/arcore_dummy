@@ -33,7 +33,7 @@
     <EnableLLVM>false</EnableLLVM>
     <BundleAssemblies>false</BundleAssemblies>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <EmbedAssembliesIntoApk>false</EmbedAssembliesIntoApk>
     <Debugger>Xamarin</Debugger>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -128,6 +128,8 @@
     <Compile Include="Rendering\PlaneRenderer.cs" />
     <Compile Include="Rendering\PointCloudRenderer.cs" />
     <Compile Include="DisplayRotationHelper.cs" />
+    <Compile Include="YuvTools\Yuv.cs" />
+    <Compile Include="YuvTools\YuvToRGBAConverter.cs" />
   </ItemGroup>
   <ItemGroup>
     <AndroidAsset Include="Assets\andy.obj" />
