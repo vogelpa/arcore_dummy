@@ -41,7 +41,7 @@ namespace HelloAR
         Snackbar mLoadingMessageSnackbar = null;
         DisplayRotationHelper mDisplayRotationHelper;
 
-        ObjectRenderer mVirtualImage = new ObjectRenderer();
+        ObjectRenderer mVirtualObject = new ObjectRenderer();
         PlaneRenderer mPlaneRenderer = new PlaneRenderer();
         PointCloudRenderer mPointCloud = new PointCloudRenderer();
         // Temporary matrix allocated here to reduce number of allocations for each frame.
@@ -223,8 +223,8 @@ namespace HelloAR
             // Prepare the other rendering objects.
             try
             {
-               
-                mVirtualImage.CreateOnGlThread(/*context=*/this, "2D.obj", "andy.png");
+
+                mVirtualObject.CreateOnGlThread(/*context=*/this, "Ellipsoid.obj", "andy.png");
                 //mVirtualImage.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
 
             }
@@ -278,7 +278,13 @@ namespace HelloAR
                 // Add a floating image if we tap and are in tracking state
                 if (tap != null && camera.TrackingState == TrackingState.Tracking)
                 {
-                    floatingPictures(frame);                    
+                    Pose pose = camera.DisplayOrientedPose;
+
+                    float[] matrix = new float[16];
+                    pose.ToMatrix(matrix, 0);
+                    mMatrices.Add(matrix);
+
+                    //floatingPictures(frame);                    
                 }  
 
                 // Draw background.
@@ -332,11 +338,9 @@ namespace HelloAR
                 mPlaneRenderer.DrawPlanes(planes, camera.DisplayOrientedPose, projmtx);
 
                 // Visualize anchors created by touch.
-                float scaleFactor =  0.01f;
-                int idx = -1;
+                float scaleFactor =  1.0f;
                 foreach (var matrix in mMatrices)
                 {
-                    idx++;
                     if (camera.TrackingState != TrackingState.Tracking)
                         continue;
 
@@ -345,8 +349,8 @@ namespace HelloAR
                     // its estimate of the world.
                     //imageAnchor.Pose.ToMatrix(mAnchorMatrix, 0);
                     // Update and draw the model and its shadow.
-                    mVirtualImage.updateModelMatrix(matrix, scaleFactor);
-                    mVirtualImage.Draw(viewmtx, projmtx, lightIntensity, mImages[idx]);
+                    mVirtualObject.updateModelMatrix(matrix, scaleFactor);
+                    mVirtualObject.Draw(viewmtx, projmtx, lightIntensity); //, mImages[idx]);
                 }
             }
 
@@ -356,83 +360,6 @@ namespace HelloAR
                 Log.Error(TAG, "Exception on the OpenGL thread", ex);
             }
         }
-
-        private void floatingPictures(Frame frame)
-        {
-            // Capture the camera image.
-            Camera camera = frame.Camera;
-            Image image = frame.AcquireCameraImage();
-
-            Pose pose = camera.DisplayOrientedPose;
-            
-            float[] matrix = new float[16];
-            pose.ToMatrix(matrix, 0);
-            mMatrices.Add(matrix);
-            
-            float[] translation = pose.GetTranslation();
-            translation[2] = 0.5f; // Assuming Z-axis is up.
-
-            // Create the adjusted pose.
-            var adjustedPose = new Pose(translation, pose.GetRotationQuaternion());
-            
-            // Create a quad to display the image.
-            //Anchor anchor = mSession.CreateAnchor(pose);
-    
-            // Anchor the quad in the world.
-            //mImageAnchors.Add(anchor);
-            int textureId = createTextureFromImage(image);
-            mImages.Add(textureId);
-            image.Close();
-            
-        }
-
-        public int createTextureFromImage(Image image)
-        {
-            Android.Graphics.Bitmap bitmap = Android.Graphics.Bitmap.CreateBitmap(image.Width, image.Height, Android.Graphics.Bitmap.Config.Argb8888);
-            mYuvToRGBAConverter.YuvToRGBA(image, ref bitmap);
-
-            ByteBuffer buffer = convertBitmapToByteBuffer(bitmap);
-
-
-            int[] textures = new int[1];
-            GLES20.GlGenTextures(1, textures, 0);
-
-            int textureId = textures[0];
-            GLES20.GlBindTexture(GLES20.GlTexture2d, textureId);
-
-            // Set default texture parameters
-            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureMinFilter, GLES20.GlLinear);
-            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureMagFilter, GLES20.GlLinear);
-            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapS, GLES20.GlClampToEdge);
-            GLES20.GlTexParameteri(GLES20.GlTexture2d, GLES20.GlTextureWrapT, GLES20.GlClampToEdge);
-
-            // Load the bitmap into the bound texture.
-            GLES20.GlTexImage2D(GLES20.GlTexture2d, 0, GLES20.GlRgba, bitmap.Width, bitmap.Height, 0, GLES20.GlRgba, GLES20.GlUnsignedByte, buffer);
-            // ByteBuffer buffer = image.GetPlanes()[0].Buffer;
-            // GLES20.GlTexImage2D(GLES20.GlTexture2d, 0, GLES20.GlLuminance, image.Width, image.Height, 0, GLES20.GlLuminance, GLES20.GlUnsignedByte, buffer);
-            bitmap.Recycle();
-
-
-            return textureId;
-        }
-
-        public ByteBuffer convertBitmapToByteBuffer(Android.Graphics.Bitmap bitmap)
-        {
-            // Calculate the number of bytes in the Bitmap.
-            int bytes = bitmap.ByteCount;
-
-            // Create a new byte buffer.
-            ByteBuffer buffer = ByteBuffer.AllocateDirect(bytes);
-
-            // Populate the byte buffer with the bitmap's pixel data.
-            bitmap.CopyPixelsToBuffer(buffer);
-
-            // Rewind the byte buffer for reading.
-            buffer.Rewind();
-
-            return buffer;
-        }
-
 
         private void showLoadingMessage()
         {

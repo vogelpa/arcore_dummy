@@ -413,84 +413,94 @@ namespace HelloAR
 		 * @see #setMaterialProperties(float, float, float, float)
 		 * @see android.opengl.Matrix
 		 */
-		public void Draw(float[] cameraView, float[] cameraPerspective, float lightIntensity, int imageTextureId)
-		{
+        public void Draw(float[] cameraView, float[] cameraPerspective, float lightIntensity)
+        {
 
-			ShaderUtil.CheckGLError(TAG, "Before draw");
+            ShaderUtil.CheckGLError(TAG, "Before draw");
 
-			// Build the ModelView and ModelViewProjection matrices
-			// for calculating object position and light.
-			Android.Opengl.Matrix.MultiplyMM(mModelViewMatrix, 0, cameraView, 0, mModelMatrix, 0);
-			Android.Opengl.Matrix.MultiplyMM(mModelViewProjectionMatrix, 0, cameraPerspective, 0, mModelViewMatrix, 0);
+            // Build the ModelView and ModelViewProjection matrices
+            // for calculating object position and light.
+            Android.Opengl.Matrix.MultiplyMM(mModelViewMatrix, 0, cameraView, 0, mModelMatrix, 0);
+            Android.Opengl.Matrix.MultiplyMM(mModelViewProjectionMatrix, 0, cameraPerspective, 0, mModelViewMatrix, 0);
 
-			GLES20.GlUseProgram(mProgram);
-            
-			int alphaUniform = GLES20.GlGetUniformLocation(mProgram, "u_Alpha");
-            GLES20.GlUniform1f(alphaUniform, 0.2f);
+            GLES20.GlUseProgram(mProgram);
 
             // Set the lighting environment properties.
             Android.Opengl.Matrix.MultiplyMV(mViewLightDirection, 0, mModelViewMatrix, 0, LIGHT_DIRECTION, 0);
-			normalizeVec3(mViewLightDirection);
-			GLES20.GlUniform4f(mLightingParametersUniform,
-				mViewLightDirection[0], mViewLightDirection[1], mViewLightDirection[2], lightIntensity);
+            normalizeVec3(mViewLightDirection);
+            GLES20.GlUniform4f(mLightingParametersUniform,
+                mViewLightDirection[0], mViewLightDirection[1], mViewLightDirection[2], lightIntensity);
 
-			// Set the object material properties.
-			GLES20.GlUniform4f(mMaterialParametersUniform, mAmbient, mDiffuse, mSpecular,
-				mSpecularPower);
+            // Set the object material properties.
+            GLES20.GlUniform4f(mMaterialParametersUniform, mAmbient, mDiffuse, mSpecular,
+                mSpecularPower);
 
-			// Attach the object texture.
-			GLES20.GlActiveTexture(GLES20.GlTexture0);
-            GLES20.GlBindTexture(GLES20.GlTexture2d, imageTextureId);
+            // Attach the object texture.
+            GLES20.GlActiveTexture(GLES20.GlTexture0);
+            GLES20.GlBindTexture(GLES20.GlTexture2d, mTextures[0]);
             GLES20.GlUniform1i(mTextureUniform, 0);
 
-			// Set the vertex attributes.
-			GLES20.GlBindBuffer(GLES20.GlArrayBuffer, mVertexBufferId);
+            // Set the vertex attributes.
+            GLES20.GlBindBuffer(GLES20.GlArrayBuffer, mVertexBufferId);
 
-			GLES20.GlVertexAttribPointer(
-				mPositionAttribute, COORDS_PER_VERTEX, GLES20.GlFloat, false, 0, mVerticesBaseAddress);
-			GLES20.GlVertexAttribPointer(
-				mNormalAttribute, 3, GLES20.GlFloat, false, 0, mNormalsBaseAddress);
-			GLES20.GlVertexAttribPointer(
-				mTexCoordAttribute, 2, GLES20.GlFloat, false, 0, mTexCoordsBaseAddress);
+            GLES20.GlVertexAttribPointer(
+                mPositionAttribute, COORDS_PER_VERTEX, GLES20.GlFloat, false, 0, mVerticesBaseAddress);
+            GLES20.GlVertexAttribPointer(
+                mNormalAttribute, 3, GLES20.GlFloat, false, 0, mNormalsBaseAddress);
+            GLES20.GlVertexAttribPointer(
+                mTexCoordAttribute, 2, GLES20.GlFloat, false, 0, mTexCoordsBaseAddress);
 
-			GLES20.GlBindBuffer(GLES20.GlArrayBuffer, 0);
+            GLES20.GlBindBuffer(GLES20.GlArrayBuffer, 0);
 
-			// Set the ModelViewProjection matrix in the shader.
-			GLES20.GlUniformMatrix4fv(
-				mModelViewUniform, 1, false, mModelViewMatrix, 0);
-			GLES20.GlUniformMatrix4fv(
-				mModelViewProjectionUniform, 1, false, mModelViewProjectionMatrix, 0);
+            // Set the ModelViewProjection matrix in the shader.
+            GLES20.GlUniformMatrix4fv(
+                mModelViewUniform, 1, false, mModelViewMatrix, 0);
+            GLES20.GlUniformMatrix4fv(
+                mModelViewProjectionUniform, 1, false, mModelViewProjectionMatrix, 0);
 
-			// Enable vertex arrays
-			GLES20.GlEnableVertexAttribArray(mPositionAttribute);
-			GLES20.GlEnableVertexAttribArray(mNormalAttribute);
-			GLES20.GlEnableVertexAttribArray(mTexCoordAttribute);
+            // Enable vertex arrays
+            GLES20.GlEnableVertexAttribArray(mPositionAttribute);
+            GLES20.GlEnableVertexAttribArray(mNormalAttribute);
+            GLES20.GlEnableVertexAttribArray(mTexCoordAttribute);
 
-            GLES20.GlEnable(GLES20.GlBlend);
-            GLES20.GlBlendFunc(GLES20.GlSrcAlpha, GLES20.GlOneMinusSrcAlpha);
+            if (mBlendMode != BlendMode.Null)
+            {
+                GLES20.GlDepthMask(false);
+                GLES20.GlEnable(GLES20.GlBlend);
+                switch (mBlendMode)
+                {
+                    case BlendMode.Shadow:
+                        // Multiplicative blending function for Shadow.
+                        GLES20.GlBlendFunc(GLES20.GlZero, GLES20.GlOneMinusSrcAlpha);
+                        break;
+                    case BlendMode.Grid:
+                        // Grid, additive blending function.
+                        GLES20.GlBlendFunc(GLES20.GlSrcAlpha, GLES20.GlOneMinusSrcAlpha);
+                        break;
+                }
+            }
 
             GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, mIndexBufferId);
-
             GLES20.GlDrawElements(GLES20.GlTriangles, mIndexCount, GLES20.GlUnsignedShort, 0);
-			GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, 0);
+            GLES20.GlBindBuffer(GLES20.GlElementArrayBuffer, 0);
 
-			if (mBlendMode != BlendMode.Null)
-			{
-				GLES20.GlDisable(GLES20.GlBlend);
-				GLES20.GlDepthMask(true);
-			}
+            if (mBlendMode != BlendMode.Null)
+            {
+                GLES20.GlDisable(GLES20.GlBlend);
+                GLES20.GlDepthMask(true);
+            }
 
-			// Disable vertex arrays
-			GLES20.GlDisableVertexAttribArray(mPositionAttribute);
-			GLES20.GlDisableVertexAttribArray(mNormalAttribute);
-			GLES20.GlDisableVertexAttribArray(mTexCoordAttribute);    
+            // Disable vertex arrays
+            GLES20.GlDisableVertexAttribArray(mPositionAttribute);
+            GLES20.GlDisableVertexAttribArray(mNormalAttribute);
+            GLES20.GlDisableVertexAttribArray(mTexCoordAttribute);
 
             GLES20.GlBindTexture(GLES20.GlTexture2d, 0);
 
-			ShaderUtil.CheckGLError(TAG, "After draw");
-		}
+            ShaderUtil.CheckGLError(TAG, "After draw");
+        }
 
-		public static void normalizeVec3(float[] v)
+        public static void normalizeVec3(float[] v)
 		{
 			float reciprocalLength = 1.0f / (float)Math.Sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 			v[0] *= reciprocalLength;
