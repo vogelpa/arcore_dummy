@@ -13,17 +13,9 @@ using System.Collections.Generic;
 using Android.Views;
 using Android.Support.V4.Content;
 using Android.Support.V4.App;
-using Javax.Microedition.Khronos.Egl;
 using System.Collections.Concurrent;
 using System;
 using Google.AR.Core.Exceptions;
-using Java.Util.Concurrent;
-using Org.W3c.Dom;
-using Java.Nio;
-using System.Linq.Expressions;
-using HelloAR.YuvTools;
-using Swissualize.Droid.YuvTools;
-using System.Drawing.Imaging;
 
 namespace HelloAR
 {
@@ -42,25 +34,37 @@ namespace HelloAR
         DisplayRotationHelper mDisplayRotationHelper;
 
         ObjectRenderer mVirtualObject = new ObjectRenderer();
+        ObjectRenderer highlightedObject = new ObjectRenderer();
+        ObjectRenderer arrowObject = new ObjectRenderer();
+
         PlaneRenderer mPlaneRenderer = new PlaneRenderer();
         PointCloudRenderer mPointCloud = new PointCloudRenderer();
-        // Temporary matrix allocated here to reduce number of allocations for each frame.
-        static float[] mAnchorMatrix = new float[16];
 
         ConcurrentQueue<MotionEvent> mQueuedSingleTaps = new ConcurrentQueue<MotionEvent>();
 
-        // Tap handling and UI.
-        List<Anchor> mImageAnchors = new List<Anchor>();
-
-        List<int> mImages = new List<int>();
-
         List<float[]> mMatrices = new List<float[]>();
 
-        YuvToRGBAConverter mYuvToRGBAConverter;
+        float[] lastObjectTranslation = new float[3];
+        
+        // Create the rotation transformation
+        float[] rotationMatrix = new float[16];
+        float[] rotationMatrixArrow = new float[16];
+
+        int highlighted = -1;
+        float[] highlightedTranslation = new float[3];
+
+        Random random = new Random();
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
+            
+            // rotate the obj
+            Matrix.SetIdentityM(rotationMatrix, 0);
+            Matrix.SetIdentityM(rotationMatrixArrow, 0);
+
+            //Matrix.RotateM(rotationMatrix, 0, 90.0f, 0.0f, 1.0f, 1.0f);
+            Matrix.RotateM(rotationMatrixArrow, 0, 180.0f, 0.0f, 0.0f, 1.0f);
 
             SetContentView(Resource.Layout.Main);
             mSurfaceView = FindViewById<GLSurfaceView>(Resource.Id.surfaceview);
@@ -128,7 +132,6 @@ namespace HelloAR
             mSurfaceView.SetEGLConfigChooser(8, 8, 8, 8, 16, 0); // Alpha used for plane blending.
             mSurfaceView.SetRenderer(this);
             mSurfaceView.RenderMode = Rendermode.Continuously;
-            mYuvToRGBAConverter = new YuvToRGBAConverter(this);
         }
 
 
@@ -223,9 +226,10 @@ namespace HelloAR
             // Prepare the other rendering objects.
             try
             {
+                mVirtualObject.CreateOnGlThread(/*context=*/this, "cylinder.obj", "blue.png");
+                highlightedObject.CreateOnGlThread(/*context=*/this, "cylinder.obj", "orange.png");
+                arrowObject.CreateOnGlThread(/*context=*/this, "arrow.obj", "orange.png");
 
-                mVirtualObject.CreateOnGlThread(/*context=*/this, "Ellipsoid.obj", "andy.png");
-                //mVirtualImage.setMaterialProperties(0.0f, 3.5f, 1.0f, 6.0f);
 
             }
             catch (Java.IO.IOException e)
@@ -276,16 +280,50 @@ namespace HelloAR
                 mQueuedSingleTaps.TryDequeue(out tap);
 
                 // Add a floating image if we tap and are in tracking state
-                if (tap != null && camera.TrackingState == TrackingState.Tracking)
-                {
-                    Pose pose = camera.DisplayOrientedPose;
+                //if (tap != null && camera.TrackingState == TrackingState.Tracking)
+                //{
+                //    Pose pose = camera.Pose;
+                //    float[] matrix = new float[16];
 
-                    float[] matrix = new float[16];
-                    pose.ToMatrix(matrix, 0);
+                //    float[] translation = pose.GetTranslation();
+                //    translation[1] = -1.5f; // Assuming Y-axis is height.
+
+                //    // Create the rotation transformation
+                //    float[] rotationMatrix = new float[16];
+                //    Matrix.SetIdentityM(rotationMatrix, 0);
+                //    Matrix.RotateM(rotationMatrix, 0, 90.0f, 0.0f, 1.0f, 1.0f);
+
+                //    // Create the adjusted pose with rotation
+                //    Pose adjustedPose = new Pose(translation, rotationMatrix);
+
+                //    adjustedPose.ToMatrix(matrix, 0);
+                //    mMatrices.Add(matrix);
+                //}
+
+                float[] matrix = new float[16];
+
+                float[] translation = camera.Pose.GetTranslation();
+                translation[1] = -1.5f; // Assuming Y-axis is height.
+
+                // Calculate the distance between the current position and the last object's position
+                float distanceThreshold = 1.0f; // Minimum distance threshold in meters
+                float distance = (float)Math.Sqrt(
+                    Math.Pow(translation[0] - lastObjectTranslation[0], 2) +
+                    Math.Pow(translation[1] - lastObjectTranslation[1], 2) +
+                    Math.Pow(translation[2] - lastObjectTranslation[2], 2)
+                    );
+
+                if (distance >= distanceThreshold)
+                {
+                    // Create the adjusted pose with rotation
+                    Pose adjustedPose = new Pose(translation, rotationMatrix);
+
+                    adjustedPose.ToMatrix(matrix, 0);
                     mMatrices.Add(matrix);
 
-                    //floatingPictures(frame);                    
-                }  
+                    // Update the last object pose
+                    lastObjectTranslation = translation;
+                }
 
                 // Draw background.
                 mBackgroundRenderer.Draw(frame);
@@ -337,20 +375,69 @@ namespace HelloAR
                 // Visualize planes.
                 mPlaneRenderer.DrawPlanes(planes, camera.DisplayOrientedPose, projmtx);
 
-                // Visualize anchors created by touch.
-                float scaleFactor =  1.0f;
-                foreach (var matrix in mMatrices)
+                if (highlighted != -1)
                 {
-                    if (camera.TrackingState != TrackingState.Tracking)
-                        continue;
+                    // Calculate the distance between the current position and the last object's position
+                    float threshold = 1.0f; // Minimum distance threshold in meters
+                    float dist = (float)Math.Sqrt(
+                        Math.Pow(translation[0] - highlightedTranslation[0], 2) +
+                        Math.Pow(translation[1] - highlightedTranslation[1], 2) +
+                        Math.Pow(translation[2] - highlightedTranslation[2], 2)
+                        );
 
-                    // Get the current combined pose of an Anchor and Plane in world space. The Anchor
-                    // and Plane poses are updated during calls to session.update() as ARCore refines
-                    // its estimate of the world.
-                    //imageAnchor.Pose.ToMatrix(mAnchorMatrix, 0);
-                    // Update and draw the model and its shadow.
-                    mVirtualObject.updateModelMatrix(matrix, scaleFactor);
-                    mVirtualObject.Draw(viewmtx, projmtx, lightIntensity); //, mImages[idx]);
+                    if (dist <= threshold) {
+                        highlighted = -1;
+                        highlightedTranslation[0] = -1;
+                        highlightedTranslation[1] = -1;
+                        highlightedTranslation[2] = -1;
+                    }
+                }
+
+                // randomly assign 1 point to be highlighted
+                if (highlighted == -1)
+                {
+                    highlighted = random.Next(mMatrices.Count);
+                    highlightedTranslation[0] = mMatrices[highlighted][12];
+                    highlightedTranslation[1] = mMatrices[highlighted][13];
+                    highlightedTranslation[2] = mMatrices[highlighted][14];
+                }
+
+                // Visualize anchors created by touch.
+                float scaleFactor = 0.001f;
+                for (int i = 0; i < mMatrices.Count; i++)
+                {
+                    {
+                        if (camera.TrackingState != TrackingState.Tracking)
+                            continue;
+
+                        // Get the current combined pose of an Anchor and Plane in world space. The Anchor
+                        // and Plane poses are updated during calls to session.update() as ARCore refines
+                        // its estimate of the world.
+                        //imageAnchor.Pose.ToMatrix(mAnchorMatrix, 0);
+                        // Update and draw the model and its shadow.
+                        if (highlighted == i)
+                        {
+                            highlightedObject.updateModelMatrix(mMatrices[i], scaleFactor*2);
+                            highlightedObject.Draw(viewmtx, projmtx, lightIntensity);
+
+                            float[] arrowMatrix = new float[16];
+                            mMatrices[i].CopyTo(arrowMatrix, 0);
+                            arrowMatrix[5] *= -1.0f;
+
+                            arrowMatrix[12] -= 0.1f; // arrow is not exactly centered
+                            arrowMatrix[14] += 0.1f; // arrow is not exactly centered
+                            
+                            arrowMatrix[13] += 1.0f; // put arrow 1.5m above tile
+
+                            arrowObject.updateModelMatrix(arrowMatrix, scaleFactor*2);
+                            arrowObject.Draw(viewmtx, projmtx, lightIntensity);
+                        }
+                        else
+                        {
+                            mVirtualObject.updateModelMatrix(mMatrices[i], scaleFactor);
+                            mVirtualObject.Draw(viewmtx, projmtx, lightIntensity);
+                        }
+                    }
                 }
             }
 
