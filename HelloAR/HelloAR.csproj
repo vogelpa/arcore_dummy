@@ -128,8 +128,6 @@
     <Compile Include="Rendering\PlaneRenderer.cs" />
     <Compile Include="Rendering\PointCloudRenderer.cs" />
     <Compile Include="DisplayRotationHelper.cs" />
-    <Compile Include="YuvTools\Yuv.cs" />
-    <Compile Include="YuvTools\YuvToRGBAConverter.cs" />
   </ItemGroup>
   <ItemGroup>
     <AndroidAsset Include="Assets\arrow.obj" />
